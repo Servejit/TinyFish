@@ -61,3 +61,24 @@ Both use the X-API-Key header. The Agent endpoint requires a starting URL, which
 - Generated video availability, download links, free usage and watermarks depend on the selected third-party website.
 - Search-assisted routing is heuristic. If the wrong site is selected, use the optional website override.
 - Recent task history is stored only in Streamlit session state and is not a permanent database.
+
+
+## NSE Stock Strategy Builder (added)
+
+The Streamlit app now includes a dedicated **NSE Stock Strategy Builder** section while retaining the original general-purpose TinyFish agent.
+
+### Strategy Research
+- Describe a trading idea in plain English.
+- Choose market, timeframe and trading style.
+- TinyFish Search discovers relevant source pages, then TinyFish Agent researches the selected page.
+- The report asks for exact entry/exit rules, indicators, risk management, execution timing, validation steps, failure modes and source URLs.
+- Download the resulting strategy report.
+
+### CSV Backtest Lab
+- Upload historical OHLC CSV data with Open, High, Low and Close columns.
+- Test SMA crossover, EMA crossover, RSI mean reversion, Bollinger mean reversion or Donchian breakout templates.
+- Configure periods, RSI thresholds and estimated transaction costs.
+- Review strategy return, buy-and-hold return, drawdown, win rate, trade count, profit factor, Sharpe estimate and equity curve.
+- Download the backtest results as CSV.
+
+The backtest is a simplified long-only historical simulation. Signals are acted on at the next bar to reduce look-ahead bias. It is not broker-connected and does not model all real-world costs or execution constraints. TinyFish Agent/browser runs may be metered; check your TinyFish plan before running repeated research.
