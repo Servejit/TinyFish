@@ -64,6 +64,10 @@ with st.sidebar:
     st.divider()
     st.caption("Search is free according to TinyFish documentation. Browser-agent runs are metered.")
 
+# Put the focused stock tool first; the original general-purpose agent remains below.
+from stock_strategy import render_stock_strategy_builder
+render_stock_strategy_builder(api_key)
+
 def valid_http_url(value):
     try:
         parsed = urlparse(value.strip())
@@ -414,10 +418,3 @@ if st.session_state.task_history:
 
 st.divider()
 st.caption("TinyFish Autonomous Agent • Search-assisted routing • Streamlit • API key is not stored in GitHub.")
-
-
-# Stock strategy research and historical CSV backtesting module.
-# Kept separate so the existing general-purpose TinyFish agent remains intact.
-from stock_strategy import render_stock_strategy_builder
-
-render_stock_strategy_builder(api_key)
