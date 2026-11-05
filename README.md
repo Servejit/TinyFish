@@ -24,34 +24,34 @@ The existing deployment can be updated by pushing these files to the same GitHub
 
 Required Streamlit Secret:
 
-\`\`\`toml
+~~~toml
 TINYFISH_API_KEY = "your_tinyfish_api_key"
-\`\`\`
+~~~
 
 Never commit the API key to GitHub.
 
 ## Run locally
 
-\`\`\`bash
+~~~bash
 python -m venv .venv
 # Windows PowerShell:
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 # macOS/Linux:
 # source .venv/bin/activate
 
 pip install -r requirements.txt
 streamlit run app.py
-\`\`\`
+~~~
 
 ## TinyFish APIs used
 
 Search:
-\`GET https://api.search.tinyfish.ai?query=...\`
+https://api.search.tinyfish.ai?query=...
 
 Agent SSE:
-\`POST https://agent.tinyfish.ai/v1/automation/run-sse\`
+https://agent.tinyfish.ai/v1/automation/run-sse
 
-Both use the \`X-API-Key\` header. The Agent endpoint requires a starting URL, which is why the app searches first.
+Both use the X-API-Key header. The Agent endpoint requires a starting URL, which is why the app searches first.
 
 ## Safety
 
