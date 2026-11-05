@@ -233,152 +233,136 @@ def _backtest(frame, strategy, fast, slow, rsi_low, rsi_high, fee_bps):
     return data, metrics
 
 
+def _extract_trade_levels(result):
+    """Extract only verified buy and sell prices from TinyFish's final result."""
+    if isinstance(result, dict):
+        def find_value(obj, keys):
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if str(key).lower().replace(" ", "_") in keys and value not in (None, ""):
+                        return value
+                for value in obj.values():
+                    found = find_value(value, keys)
+                    if found not in (None, ""):
+                        return found
+            elif isinstance(obj, list):
+                for value in obj:
+                    found = find_value(value, keys)
+                    if found not in (None, ""):
+                        return found
+            return None
+
+        buy = find_value(result, {"buy_price", "entry_price", "buy", "entry"})
+        sell = find_value(result, {"sell_price", "target_price", "sell", "target", "exit_price"})
+        status = find_value(result, {"signal", "recommendation", "status", "trade_status"})
+        return buy, sell, status
+
+    text_value = str(result or "")
+    # Prefer JSON embedded in a text response.
+    match = re.search(r"\{[\s\S]*\}", text_value)
+    if match:
+        try:
+            parsed = json.loads(match.group(0))
+            return _extract_trade_levels(parsed)
+        except Exception:
+            pass
+
+    buy_match = re.search(r"(?:buy(?:_price)?|entry(?:_price)?)\s*[:=]\s*(?:₹|INR\s*)?([0-9]+(?:\.[0-9]+)?)", text_value, re.I)
+    sell_match = re.search(r"(?:sell(?:_price)?|target(?:_price)?|exit(?:_price)?)\s*[:=]\s*(?:₹|INR\s*)?([0-9]+(?:\.[0-9]+)?)", text_value, re.I)
+    return (
+        buy_match.group(1) if buy_match else None,
+        sell_match.group(1) if sell_match else None,
+        None,
+    )
+
+
 def render_stock_strategy_builder(api_key):
     st.divider()
-    st.header("📈 NSE Stock Strategy Builder")
-    st.caption("Research trading ideas with TinyFish, turn them into explicit rules, then test rule-based templates on your own OHLC CSV.")
-    research_tab, backtest_tab, guide_tab = st.tabs(["Strategy Research", "CSV Backtest Lab", "How to use"])
+    st.header("📈 Stock Buy / Sell Price Finder")
+    st.caption("Enter an NSE stock. Get only the suggested buy-entry and sell-target prices.")
 
-    with research_tab:
-        st.subheader("Build a strategy from your idea")
-        idea = st.text_area(
-            "Describe your trading idea",
-            height=120,
-            placeholder="Example: Find a 5-minute intraday bullish strategy using Ichimoku Kijun, Alligator and price action. I want clear entry, exit and risk rules.",
-            key="stock_strategy_idea",
-        )
-        c1, c2, c3 = st.columns(3)
-        market = c1.selectbox("Market", ["NSE India", "BSE India", "US stocks", "Crypto"], key="sb_market")
-        timeframe = c2.selectbox("Timeframe", ["1-minute", "3-minute", "5-minute", "15-minute", "30-minute", "1-hour", "Daily", "Swing / multi-day"], index=2, key="sb_tf")
-        style = c3.selectbox("Trading style", ["Intraday", "Scalping", "Swing", "Positional"], key="sb_style")
-        with st.expander("Optional strategy constraints"):
-            indicators = st.text_input("Preferred indicators / concepts", "Price action, volume, Ichimoku, Alligator, Bollinger Bands", key="sb_indicators")
-            risk = st.selectbox("Risk preference", ["Conservative", "Balanced", "Aggressive"], index=1, key="sb_risk")
-            avoid = st.text_input("Conditions to avoid", "Look-ahead bias, repainting signals, unsupported claims", key="sb_avoid")
-        if st.button("🔎 Research and build strategy", type="primary", use_container_width=True, key="sb_research"):
-            if not api_key or not str(api_key).strip():
-                st.error("Add your TinyFish API key in the Connection section of the sidebar.")
-            elif not idea.strip():
-                st.error("Describe the trading idea first.")
-            else:
-                try:
-                    query = f"{market} {timeframe} {style} stock trading strategy {indicators} backtesting rules risk management"
-                    with st.status("Researching strategy sources…", expanded=True) as status:
-                        sources = _search_stock_sources(api_key.strip(), query)
-                        if not sources:
-                            raise RuntimeError("TinyFish Search returned no usable source URLs. Try a broader strategy description.")
-                        st.write(f"Found {len(sources)} source pages. Starting TinyFish research on {sources[0]['url']}")
-                        goal = f"""Act as a rigorous quantitative trading strategy researcher. Develop a testable strategy, not a trading recommendation.
+    stock = st.text_input(
+        "Stock name or NSE symbol",
+        placeholder="Example: RELIANCE, HDFCBANK, TCS",
+        key="sb_stock_symbol",
+    ).strip().upper()
 
-USER IDEA: {idea}
-MARKET: {market}
-TIMEFRAME: {timeframe}
-STYLE: {style}
-PREFERRED CONCEPTS: {indicators}
-RISK PREFERENCE: {risk}
-AVOID: {avoid}
+    timeframe = st.selectbox(
+        "Trading timeframe",
+        ["3-minute", "5-minute", "15-minute", "1-hour", "Daily"],
+        index=1,
+        key="sb_quick_timeframe",
+    )
 
-Research the current page and follow relevant credible references where possible. Prefer exchange/regulator/official documentation and established educational sources. Distinguish verified facts from hypotheses. Do not invent backtest statistics or claim profitability.
-
-Return a well-structured strategy report with:
-1. Strategy name and concise thesis.
-2. Exact instruments/universe assumptions and market-session constraints.
-3. Indicators with exact parameters and formulas.
-4. Entry conditions as numbered AND/OR rules that can be coded without interpretation.
-5. Exit conditions, stop-loss, position sizing and maximum risk per trade.
-6. Filters and no-trade conditions.
-7. Execution timing: signal candle vs next candle, avoiding look-ahead/repainting.
-8. Suggested validation: out-of-sample, walk-forward, transaction costs, slippage, sample size.
-9. Failure modes, market regimes where it may underperform, and risks.
-10. A pseudocode block.
-11. Sources with page title and exact URL; label any claim that could not be independently verified.
-
-Do not place trades, give guaranteed-return language, or present this as personalized financial advice."""
-                        progress = st.empty()
-                        result, events = _run_stock_research(api_key.strip(), sources[0]["url"], goal, progress)
-                        status.update(label="Strategy research finished", state="complete", expanded=False)
-                    st.session_state["stock_strategy_result"] = {
-                        "idea": idea, "market": market, "timeframe": timeframe, "style": style,
-                        "sources": sources, "result": result, "events": events,
-                        "created": datetime.now(timezone.utc).isoformat(),
-                    }
-                except Exception as exc:
-                    st.error(f"Strategy research failed: {exc}")
-
-        report = st.session_state.get("stock_strategy_result")
-        if report:
-            st.markdown("### Strategy research report")
-            st.caption(f"{report['market']} · {report['timeframe']} · {report['style']} · {report['created']}")
-            result = report["result"]
-            if isinstance(result, (dict, list)):
-                st.json(result, expanded=True)
-                download_text = json.dumps(result, ensure_ascii=False, indent=2)
-            else:
-                st.markdown(str(result))
-                download_text = str(result)
-            st.download_button("Download strategy report", download_text, file_name="stock_strategy_report.md", mime="text/markdown", key="sb_download")
-            with st.expander("Research pages found"):
-                for source in report["sources"]:
-                    label = source["title"] or source["url"]
-                    st.markdown(f"- [{label}]({source['url']}) — {source['snippet']}")
-            with st.expander("TinyFish event log"):
-                st.json(report["events"], expanded=False)
-
-    with backtest_tab:
-        st.subheader("Test a strategy on historical OHLC data")
-        st.info("Upload a CSV exported from your data provider. This lab tests the selected built-in rule set; it does not automatically translate a TinyFish research report into executable code.")
-        uploaded = st.file_uploader("Upload OHLC CSV", type=["csv"], key="sb_csv")
-        a, b, c = st.columns(3)
-        strategy = a.selectbox("Strategy template", ["SMA crossover", "EMA crossover", "RSI mean reversion", "Bollinger mean reversion", "Donchian breakout"], key="sb_template")
-        fast = b.number_input("Fast / RSI period", min_value=2, max_value=100, value=14, key="sb_fast")
-        slow = c.number_input("Slow / band / breakout period", min_value=5, max_value=250, value=50, key="sb_slow")
-        d, e = st.columns(2)
-        rsi_low = d.slider("RSI entry threshold", 5, 45, 30, key="sb_rsi_low")
-        rsi_high = e.slider("RSI exit threshold", 50, 95, 60, key="sb_rsi_high")
-        fee_bps = st.number_input("Estimated transaction cost per side (basis points)", min_value=0.0, max_value=200.0, value=5.0, step=0.5, key="sb_fee")
-        if uploaded is not None and st.button("▶ Run backtest", type="primary", use_container_width=True, key="sb_run_bt"):
+    if st.button("Find buy and sell prices", type="primary", use_container_width=True, key="sb_quick_run"):
+        if not api_key or not str(api_key).strip():
+            st.error("Add your TinyFish API key in the sidebar.")
+        elif not stock:
+            st.error("Enter a stock name or NSE symbol.")
+        else:
             try:
-                raw = pd.read_csv(uploaded)
-                clean = _clean_ohlcv(raw)
-                if strategy in ("SMA crossover", "EMA crossover") and fast >= slow:
-                    raise ValueError("For crossover strategies, Fast period must be smaller than Slow period.")
-                if strategy == "RSI mean reversion" and rsi_low >= rsi_high:
-                    raise ValueError("RSI entry threshold must be below exit threshold.")
-                results, metrics = _backtest(clean, strategy, int(fast), int(slow), int(rsi_low), int(rsi_high), float(fee_bps))
-                st.session_state["stock_backtest_result"] = (results, metrics, strategy)
+                query = f"{stock} NSE India latest share price {timeframe} technical entry target price"
+                with st.spinner("Checking stock data and calculating levels…"):
+                    sources = _search_stock_sources(api_key.strip(), query)
+                    if not sources:
+                        raise RuntimeError("No stock-data page was found. Check the symbol and try again.")
+
+                    # Use only the highest-ranked search result to reduce browser navigation time.
+                    source = sources[0]
+                    goal = f"""You are a fast Indian stock-market price-level assistant.
+
+Stock: {stock} (NSE India)
+Trading timeframe: {timeframe}
+
+Use ONLY this page and the minimum navigation needed to verify the latest available stock price and relevant technical data. Do not browse unrelated pages, write an essay, or provide general education.
+
+Determine one technically justified BUY ENTRY PRICE and one SELL TARGET PRICE for this stock and timeframe. Use the page's actual current/latest data. Do not invent live prices, indicators, support/resistance, or calculations. If the page does not provide enough reliable data to calculate both prices, return null for the unavailable price.
+
+Return ONLY valid JSON, with no markdown and no explanation:
+{{
+  "stock": "{stock}",
+  "buy_price": number_or_null,
+  "sell_price": number_or_null,
+  "signal": "BUY" or "WAIT",
+  "data_as_of": "date/time shown by source or unavailable"
+}}
+
+Rules:
+- Prices must be numeric INR values, not percentages.
+- buy_price is the proposed entry price, not just the current market price unless that is genuinely the entry.
+- sell_price is the proposed exit/target price above the buy price for a long trade.
+- If no reliable setup exists, use null for both prices and signal WAIT.
+- Never guarantee profit. Never place an order.
+- Finish as soon as these four fields are determined."""
+
+                    progress = st.empty()
+                    progress.caption("TinyFish is checking one source…")
+                    result, events = _run_stock_research(api_key.strip(), source["url"], goal, progress)
+                    buy, sell, signal = _extract_trade_levels(result)
+                    st.session_state["stock_quick_result"] = {
+                        "stock": stock,
+                        "timeframe": timeframe,
+                        "buy": buy,
+                        "sell": sell,
+                        "signal": signal,
+                        "source": source["url"],
+                        "raw": result,
+                        "checked": datetime.now(timezone.utc).isoformat(),
+                    }
             except Exception as exc:
-                st.error(f"Backtest could not run: {exc}")
-        bt = st.session_state.get("stock_backtest_result")
-        if bt:
-            results, metrics, used_strategy = bt
-            st.markdown(f"### Results — {used_strategy}")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("Strategy return", f"{metrics['Strategy return']:.2%}")
-            m2.metric("Buy & hold", f"{metrics['Buy & hold']:.2%}")
-            m3.metric("Max drawdown", f"{metrics['Max drawdown']:.2%}")
-            m4.metric("Win rate", f"{metrics['Win rate']:.1%}")
-            m5, m6, m7 = st.columns(3)
-            m5.metric("Closed trades", str(metrics["Closed trades"]))
-            pf = metrics["Profit factor"]
-            m6.metric("Profit factor", "∞" if math.isinf(pf) else f"{pf:.2f}")
-            m7.metric("Sharpe (252-bar)", f"{metrics['Sharpe (252-bar)']:.2f}")
-            chart = results[["equity", "buy_hold"]].rename(columns={"equity": "Strategy equity", "buy_hold": "Buy & hold"})
-            st.line_chart(chart)
-            st.caption("Signals execute on the next bar. Costs are deducted on position changes. Results are historical simulations, not predictions; actual fills, taxes, slippage and corporate actions may differ.")
-            export = results.reset_index().to_csv(index=False)
-            st.download_button("Download backtest results CSV", export, file_name="stock_strategy_backtest.csv", mime="text/csv", key="sb_bt_download")
+                st.error(f"Could not calculate prices: {exc}")
 
-    with guide_tab:
-        st.markdown("""
-### CSV format
-Your file should contain at least these columns: `Open`, `High`, `Low`, `Close`. A `Date` or `Datetime` column is recommended. `Volume` is optional.
-
-### Included templates
-- **SMA / EMA crossover:** long when fast average is above slow average.
-- **RSI mean reversion:** enter after RSI falls below the entry threshold; exit after it rises above the exit threshold.
-- **Bollinger mean reversion:** enter below the lower 2-standard-deviation band; exit at the middle band.
-- **Donchian breakout:** enter above the prior rolling high; exit below the prior rolling low.
-
-### Important limitations
-This is a research and paper-testing tool, not an order execution system. It does not connect to a broker. The included backtest is long-only and simplified; it does not model intrabar stop fills, market impact, taxes, circuit limits, survivorship bias or corporate actions. Test with out-of-sample data and realistic slippage before considering live use.
-""")
+    result = st.session_state.get("stock_quick_result")
+    if result:
+        st.divider()
+        st.subheader(result["stock"])
+        if result["buy"] is not None and result["sell"] is not None:
+            buy_col, sell_col = st.columns(2)
+            buy_col.metric("BUY PRICE", f"₹{result['buy']}")
+            sell_col.metric("SELL PRICE", f"₹{result['sell']}")
+        else:
+            st.warning("No reliable buy/sell setup was returned. Try again later or use a different timeframe.")
+        st.caption(f"Timeframe: {result['timeframe']} · Signal: {result['signal'] or 'Not confirmed'}")
+        st.caption("Prices are research estimates, not guaranteed execution prices. Verify the live NSE quote before placing any trade.")
+        with st.expander("Source"):
+            st.write(result["source"])
