@@ -1,66 +1,63 @@
-# TinyFish Streamlit Web Agent
+# TinyFish Autonomous Agent
 
-A standalone Streamlit interface for running TinyFish browser-agent tasks.
+A Streamlit app that accepts a natural-language task, discovers a suitable website with TinyFish Search, then runs TinyFish Agent on the selected website.
 
-## Features
+## What changed
 
-- Enter a website URL and natural-language goal.
-- Stream TinyFish Server-Sent Events (SSE) while the agent runs.
-- Show progress messages and a browser preview URL when provided.
-- Display returned JSON/text and download JSON, CSV, or TXT.
-- Keep the latest 20 tasks in the current Streamlit session.
+- No website URL is required for normal tasks.
+- Describe the desired outcome in plain English.
+- The app searches for candidate websites automatically.
+- It selects a candidate and starts TinyFish browser automation.
+- Optional manual website override remains available under Advanced options.
+- Includes a text-to-video workflow: describe the video you want and the agent searches for a suitable generator, then attempts the browser workflow.
+- Shows browser progress, preview URL when supplied, final result, candidate websites and event log.
+
+## How the routing works
+
+TinyFish Search is used to discover possible websites. The app ranks the returned candidates using task-intent keywords and selects the top candidate. TinyFish Agent then receives that URL and a detailed natural-language goal.
+
+This is search-assisted autonomous routing. It is not a separate general-purpose LLM planner: TinyFish Agent performs the reasoning and actions on the selected website. Search and Fetch are documented as free; Agent/browser automation is metered by TinyFish.
+
+## Deploy on Streamlit Community Cloud
+
+The existing deployment can be updated by pushing these files to the same GitHub repository. Your existing Streamlit app and Secrets should remain in place.
+
+Required Streamlit Secret:
+
+\`\`\`toml
+TINYFISH_API_KEY = "your_tinyfish_api_key"
+\`\`\`
+
+Never commit the API key to GitHub.
 
 ## Run locally
 
-```bash
+\`\`\`bash
 python -m venv .venv
 # Windows PowerShell:
-.\.venv\Scripts\Activate.ps1
+.\\.venv\\Scripts\\Activate.ps1
 # macOS/Linux:
 # source .venv/bin/activate
 
 pip install -r requirements.txt
 streamlit run app.py
-```
+\`\`\`
 
-Paste your TinyFish API key into the sidebar.
+## TinyFish APIs used
 
-## Deploy on Streamlit Community Cloud
+Search:
+\`GET https://api.search.tinyfish.ai?query=...\`
 
-1. Create a new public or private GitHub repository.
-2. Upload `app.py`, `requirements.txt`, and this `README.md` to the repository root.
-3. Open https://share.streamlit.io/ and sign in with GitHub.
-4. Choose **Create app**, select the repository, branch, and `app.py`.
-5. In **Advanced settings → Secrets**, add:
+Agent SSE:
+\`POST https://agent.tinyfish.ai/v1/automation/run-sse\`
 
-```toml
-TINYFISH_API_KEY = "your_tinyfish_api_key"
-```
+Both use the \`X-API-Key\` header. The Agent endpoint requires a starting URL, which is why the app searches first.
 
-6. Deploy the app. Never commit your API key to GitHub.
+## Safety
 
-You can also leave the secret unset and paste the key into the app sidebar at runtime.
-
-## TinyFish API
-
-The app uses the TinyFish Agent SSE endpoint:
-
-`POST https://agent.tinyfish.ai/v1/automation/run-sse`
-
-Authentication header: `X-API-Key`
-
-Request body:
-
-```json
-{
-  "url": "https://www.example.com",
-  "goal": "Describe the website task here"
-}
-```
-
-## Notes
-
-- Agent tasks can take time; keep the Streamlit page open while the SSE response is being read.
-- Task history is stored in Streamlit session state and is not a permanent database.
-- Start with public websites. Login-protected workflows may require TinyFish Vault/credential configuration.
-- Do not use browser automation to bypass access controls, CAPTCHAs, or website terms, or to make purchases or other irreversible actions without appropriate human review.
+- The agent is instructed not to purchase, subscribe, start paid trials, spend credits, publish publicly, send messages, delete data, or submit sensitive information.
+- If a site requires one of those actions, the agent should stop and ask the user to complete/confirm it manually.
+- The agent must not bypass CAPTCHA, access controls, paywalls, or website security.
+- Generated video availability, download links, free usage and watermarks depend on the selected third-party website.
+- Search-assisted routing is heuristic. If the wrong site is selected, use the optional website override.
+- Recent task history is stored only in Streamlit session state and is not a permanent database.
