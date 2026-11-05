@@ -82,3 +82,7 @@ The Streamlit app now includes a dedicated **NSE Stock Strategy Builder** sectio
 - Download the backtest results as CSV.
 
 The backtest is a simplified long-only historical simulation. Signals are acted on at the next bar to reduce look-ahead bias. It is not broker-connected and does not model all real-world costs or execution constraints. TinyFish Agent/browser runs may be metered; check your TinyFish plan before running repeated research.
+
+
+### Simplified stock output (latest update)
+The Stock Buy / Sell Price Finder is now placed at the top of the app. Enter an NSE symbol and timeframe. It uses one TinyFish Search result and one focused browser run, then displays only **BUY PRICE** and **SELL PRICE** (or a no-reliable-setup message). The verbose strategy report and event log are no longer shown in this stock workflow. The original general-purpose TinyFish task runner remains below it.
