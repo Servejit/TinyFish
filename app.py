@@ -303,10 +303,12 @@ if run_clicked:
                 events, final_event, preview_url = run_agent(
                     api_key.strip(), selected_url, goal, progress
                 )
-                if final_event and str(final_event.get("type", "")).upper() == "COMPLETE":
+                final_type = str((final_event or {}).get("type", "")).upper()
+                final_status = str((final_event or {}).get("status", "")).upper()
+                if final_type == "COMPLETE" and final_status in ("COMPLETED", "SUCCESS", "SUCCEEDED"):
                     status.update(label="Task completed by TinyFish", state="complete", expanded=False)
                 elif final_event:
-                    status.update(label="Agent reported an error", state="error", expanded=True)
+                    status.update(label=f"TinyFish run ended: {final_status or final_type}", state="error", expanded=True)
                 else:
                     status.update(label="Stream ended without a final event", state="error", expanded=True)
 
@@ -353,6 +355,22 @@ if record:
     c1, c2 = st.columns(2)
     c1.metric("Browser events", len(record.get("events", [])))
     c2.metric("Agent status", str(status_value))
+
+    if str(status_value).upper() in ("FAILED", "ERROR", "CANCELLED"):
+        st.error("TinyFish did not complete this task. The COMPLETE event is only the end of the stream; check the run status below.")
+        error_info = final.get("error")
+        if error_info:
+            st.markdown("#### TinyFish error details")
+            if isinstance(error_info, (dict, list)):
+                st.json(error_info, expanded=True)
+            else:
+                st.code(str(error_info))
+        if final.get("help_url"):
+            st.markdown(f"[Open TinyFish troubleshooting documentation]({final['help_url']})")
+        st.markdown("#### Request details")
+        st.write("**Selected website:**", record.get("website"))
+        st.write("**Search query:**", record.get("search_query") or "Manual website override")
+        st.caption("Do not share your API key. If you contact TinyFish support, share the run ID and error message only.")
 
     if result is not None:
         st.markdown("#### Result")
