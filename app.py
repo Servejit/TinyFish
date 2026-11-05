@@ -414,3 +414,10 @@ if st.session_state.task_history:
 
 st.divider()
 st.caption("TinyFish Autonomous Agent • Search-assisted routing • Streamlit • API key is not stored in GitHub.")
+
+
+# Stock strategy research and historical CSV backtesting module.
+# Kept separate so the existing general-purpose TinyFish agent remains intact.
+from stock_strategy import render_stock_strategy_builder
+
+render_stock_strategy_builder(api_key)
