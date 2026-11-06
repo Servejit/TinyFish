@@ -86,3 +86,31 @@ The backtest is a simplified long-only historical simulation. Signals are acted 
 
 ### Simplified stock output (latest update)
 The Stock Buy / Sell Price Finder is now placed at the top of the app. Enter an NSE symbol and timeframe. It uses one TinyFish Search result and one focused browser run, then displays only **BUY PRICE** and **SELL PRICE** (or a no-reliable-setup message). The verbose strategy report and event log are no longer shown in this stock workflow. The original general-purpose TinyFish task runner remains below it.
+
+
+## Comic E-book Studio (added)
+
+The Streamlit app now includes a dedicated **Comic E-book Studio** while preserving the existing NSE stock tools and general-purpose TinyFish task runner.
+
+### What it does
+- Accepts any new e-book topic.
+- Lets you choose the chapter count, target audience, language, illustration style and author name.
+- Uses TinyFish Search to discover a suitable comic/storybook creation website.
+- Sends a detailed comic publishing goal to the TinyFish Agent API.
+- Requests original stories, illustrated comic pages, a professional cover and a complete PDF export.
+- Displays the browser preview, run events, agent report and any PDF/cover URLs returned by the website.
+
+### Important setup and limitations
+- Uses the existing `TINYFISH_API_KEY` Streamlit Secret; no API key is hardcoded.
+- TinyFish's Agent API starts a new run from a website URL and a natural-language goal. The Playground run URL is a run record, not a reusable agent identifier accepted by this API. The app therefore sends the reusable comic-book instructions with each new run.
+- The website selected by TinyFish must actually support illustrated book creation and PDF export. Some sites require a user login, paid plan or credits. The app instructs the agent not to purchase, subscribe, spend credits or bypass access controls.
+- A completed browser run does not guarantee that a PDF was created. Check the returned file links and the browser session. The app reports when no PDF link is returned.
+- Generated content and artwork must be checked for quality and commercial-use licensing before selling.
+
+### Use it
+1. Deploy the updated `main` branch on Streamlit Community Cloud.
+2. Keep your existing `TINYFISH_API_KEY` secret.
+3. Open **Comic E-book Studio**.
+4. Enter a topic, choose the settings and click **Create my comic e-book**.
+5. Review the result and open the PDF link returned by the creation website.
+
