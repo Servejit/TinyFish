@@ -224,24 +224,33 @@ def _find_output_links(value):
     links = []
     seen = set()
 
+    def add_url(label, candidate):
+        if not _valid_url(candidate):
+            return
+        lower = (label + " " + candidate).lower()
+        if (
+            any(word in lower for word in ("pdf", "download", "file", "cover", "image"))
+            or candidate.lower().split("?")[0].endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp"))
+        ) and candidate not in seen:
+            seen.add(candidate)
+            links.append((label or "Output file", candidate))
+
     def walk(node):
         if isinstance(node, dict):
             for key, child in node.items():
-                if isinstance(child, str) and _valid_url(child):
-                    label = key.replace("_", " ").title()
-                    lower = (key + " " + child).lower()
-                    if (
-                        any(word in lower for word in ("pdf", "download", "file", "cover", "image"))
-                        or child.lower().split("?")[0].endswith((".pdf", ".png", ".jpg", ".jpeg", ".webp"))
-                    ):
-                        if child not in seen:
-                            seen.add(child)
-                            links.append((label or "Output file", child))
+                if isinstance(child, str):
+                    add_url(key.replace("_", " ").title(), child)
+                    # Some agents return the download URL inside a text/markdown report.
+                    for candidate in re.findall(r"https?://[^\\s<>\\\"']+", child):
+                        add_url(key.replace("_", " ").title(), candidate.rstrip(".,)"))
                 elif isinstance(child, (dict, list)):
                     walk(child)
         elif isinstance(node, list):
             for child in node:
                 walk(child)
+        elif isinstance(node, str):
+            for candidate in re.findall(r"https?://[^\\s<>\\\"']+", node):
+                add_url("Output file", candidate.rstrip(".,)"))
 
     walk(value)
     return links
