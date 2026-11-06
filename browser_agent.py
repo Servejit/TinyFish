@@ -1,4 +1,4 @@
-"""Browser Use agent powered by the native Browser Use Groq integration."""
+"""Browser Use agent powered by Groq, configured for text-only page observations."""
 import asyncio
 import os
 import subprocess
@@ -7,8 +7,10 @@ from pathlib import Path
 
 import streamlit as st
 
-# This model is listed in Browser Use's current Groq integration guidance.
-GROQ_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
+# Active Groq production model. Browser Use vision is disabled below because
+# Groq's Chat Completions endpoint rejects the non-string multimodal content
+# produced by some Browser Use + Groq combinations.
+GROQ_MODEL = "openai/gpt-oss-20b"
 MAX_TASK_LENGTH = 3000
 
 
@@ -27,15 +29,19 @@ def ensure_chromium():
 
 
 async def run_browser_task(task, api_key, max_steps):
-    # Use Browser Use's own ChatGroq class. Do not use langchain_groq.ChatGroq:
-    # Browser Use may send structured/multimodal message content that the
-    # LangChain Groq wrapper/API path can reject with HTTP 400.
     from browser_use import Agent, Browser, ChatGroq
 
     os.environ["GROQ_API_KEY"] = api_key
     llm = ChatGroq(model=GROQ_MODEL, temperature=0)
     browser = Browser()
-    agent = Agent(task=task, llm=llm, browser=browser)
+    # Text-only observations avoid sending screenshot/image content parts to
+    # Groq. Navigation and page interaction still run through the browser.
+    agent = Agent(
+        task=task,
+        llm=llm,
+        browser=browser,
+        use_vision=False,
+    )
     try:
         history = await agent.run(max_steps=max_steps)
         final_result = history.final_result() or "No final text report was returned."
@@ -62,7 +68,7 @@ async def run_browser_task(task, api_key, max_steps):
 def render_browser_use_agent():
     st.divider()
     st.header("Open-source Browser Agent (Browser Use + Groq)")
-    st.caption("Browser Use's native Groq integration. No TinyFish API is required.")
+    st.caption("Browser Use with Groq text-only page observations. No TinyFish API is required.")
     try:
         groq_key = st.secrets.get("GROQ_API_KEY", "").strip()
     except Exception:
@@ -83,7 +89,7 @@ def render_browser_use_agent():
             key="browser_use_task",
         )
         max_steps = st.slider("Maximum browser steps", 3, 15, 8, key="browser_use_max_steps")
-        st.caption("Model: " + GROQ_MODEL + " | Maximum task length: " + str(MAX_TASK_LENGTH))
+        st.caption("Model: " + GROQ_MODEL + " | Vision: disabled for Groq message compatibility")
         st.info(
             "Safety limits: no purchases, subscriptions, spending credits, public posting, messages, "
             "deletions, or sensitive data submission. Stop at CAPTCHA, paywalls, or access controls. "
