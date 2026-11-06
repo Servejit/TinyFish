@@ -72,6 +72,10 @@ render_stock_strategy_builder(api_key)
 from comic_ebook import render_comic_ebook_studio
 render_comic_ebook_studio(api_key)
 
+# Optional open-source browser agent; existing TinyFish workflows remain intact.
+from browser_agent import render_browser_use_agent
+render_browser_use_agent()
+
 def valid_http_url(value):
     try:
         parsed = urlparse(value.strip())
