@@ -114,3 +114,24 @@ The Streamlit app now includes a dedicated **Comic E-book Studio** while preserv
 4. Enter a topic, choose the settings and click **Create my comic e-book**.
 5. Review the result and open the PDF link returned by the creation website.
 
+## Optional Open-source Browser Agent (Browser Use + Groq)
+
+The app includes a separate experimental browser workflow. It does not replace the existing TinyFish stock tools, Comic E-book Studio, or TinyFish general-purpose task runner.
+
+### Setup
+
+Add this secret in Streamlit Community Cloud → your app → Settings → Secrets:
+
+    GROQ_API_KEY = "your_groq_api_key"
+
+Never commit the key to GitHub or paste it into chat. The optional agent uses Browser Use with the Groq model `openai/gpt-oss-20b` and Playwright Chromium. It attempts to install Chromium on first use if the hosting environment permits it.
+
+### Limitations
+
+- This is an experimental open-source browser workflow, not a TinyFish run.
+- It uses a headless browser on the Streamlit server; it does not open a controllable browser window on the phone.
+- Login sessions and browser cookies are not saved between runs.
+- Streamlit Community Cloud has resource and execution limits. Chromium may fail to install or launch if the free server lacks required system dependencies or memory.
+- Groq free-tier access and rate limits can change. Rate-limit errors require waiting; the app does not fall back to a paid provider.
+- The browser agent is instructed not to purchase, spend credits, publish, send messages, delete data, submit sensitive information, or bypass CAPTCHA, paywalls, or access controls.
+- A completed browser run is not proof that a requested external action succeeded. Verify the reported result yourself.
