@@ -32,15 +32,14 @@ async def run_browser_task(task, api_key, max_steps):
     llm = ChatGroq(model=GROQ_MODEL, temperature=0)
     browser = Browser()
 
-    # Groq free-tier limit is 8,000 TPM for this account. Keep each prompt
-    # small by limiting retained history, DOM attributes, clickable elements,
-    # and actions per model call. Vision remains disabled.
+    # Browser Use requires max_history_items to be None or greater than 5.
+    # Keep it at the minimum valid value to limit prompt size for Groq.
     agent = Agent(
         task=task,
         llm=llm,
         browser=browser,
         use_vision=False,
-        max_history_items=2,
+        max_history_items=6,
         max_actions_per_step=2,
         max_clickable_elements_length=3000,
         include_attributes=["title", "aria-label", "placeholder", "name", "role", "type"],
