@@ -454,7 +454,8 @@ def render_comic_ebook_studio(api_key):
             else:
                 st.text_area("Agent report", str(result), height=220)
 
-            output_links = _find_output_links(result)
+            # Download links may be emitted in an earlier SSE event rather than resultJson.
+            output_links = _find_output_links({"result": result, "events": record.get("events", [])})
             if output_links:
                 st.markdown("#### Files reported by TinyFish")
                 for label, url in output_links:
