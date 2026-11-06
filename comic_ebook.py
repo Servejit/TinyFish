@@ -270,7 +270,7 @@ def _find_output_links(value):
                 if isinstance(child, str):
                     add_url(key.replace("_", " ").title(), child)
                     # Some agents return the download URL inside a text/markdown report.
-                    for candidate in re.findall(r"https?://\\S+", child):
+                    for candidate in re.findall(r"https?://\S+", child):
                         add_url(key.replace("_", " ").title(), candidate.rstrip(".,)"))
                 elif isinstance(child, (dict, list)):
                     walk(child)
@@ -278,7 +278,7 @@ def _find_output_links(value):
             for child in node:
                 walk(child)
         elif isinstance(node, str):
-            for candidate in re.findall(r"https?://\\S+", node):
+            for candidate in re.findall(r"https?://\S+", node):
                 add_url("Output file", candidate.rstrip(".,)"))
 
     walk(value)
