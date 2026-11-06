@@ -193,7 +193,7 @@ def _parse_sse_line(line):
         return {"type": "MESSAGE", "message": raw}
 
 
-def _run_comic_agent(api_key, website, goal, progress_area):
+def _run_comic_agent(api_key, website, goal, progress_area, profile_id=None):
     response = requests.post(
         AGENT_URL,
         headers={
@@ -201,7 +201,12 @@ def _run_comic_agent(api_key, website, goal, progress_area):
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         },
-        json={"url": website, "goal": goal},
+        json={
+            "url": website,
+            "goal": goal,
+            **({"use_profile": True} if profile_id else {}),
+            **({"profile_id": profile_id} if profile_id else {}),
+        },
         stream=True,
         timeout=TIMEOUT,
     )
@@ -340,12 +345,26 @@ def render_comic_ebook_studio(api_key):
             placeholder="Example: Set the stories in India; use Indian names and locations.",
             height=75,
         )
-        with st.expander("Advanced option"):
+        with st.expander("Advanced options — website and sign-in"):
             website_override = st.text_input(
                 "Specific comic creation website (optional)",
                 placeholder="https://example.com",
             )
             st.caption("Leave blank to let TinyFish Search discover a suitable website.")
+            profile_id = st.text_input(
+                "TinyFish Browser Context Profile ID (optional)",
+                placeholder="Enter the saved profile ID after signing in",
+                help=(
+                    "Use a TinyFish Browser Context Profile to let the agent start "
+                    "with an authorized signed-in session. Do not enter your password here."
+                ),
+            ).strip()
+            st.caption(
+                "For login-required websites, create a Browser Context Profile in TinyFish: "
+                "open its profile setup browser, sign in yourself, save the profile, then "
+                "paste its profile ID here. The live STREAMING_URL is a browser preview, "
+                "not a guaranteed interactive login window."
+            )
         submitted = st.form_submit_button(
             "🎨 Create my comic e-book",
             type="primary",
@@ -392,7 +411,8 @@ def render_comic_ebook_studio(api_key):
                 progress_area = st.empty()
                 st.write("Starting TinyFish Agent. This may take several minutes.")
                 events, final_event, preview_url = _run_comic_agent(
-                    api_key.strip(), selected_url, goal, progress_area
+                    api_key.strip(), selected_url, goal, progress_area,
+                    profile_id=profile_id or None,
                 )
                 final_type = str((final_event or {}).get("type") or "").upper()
                 final_status = str((final_event or {}).get("status") or "").upper()
@@ -430,6 +450,7 @@ def render_comic_ebook_studio(api_key):
             record = {
                 "project": project,
                 "website": selected_url,
+                "profile_id_used": bool(profile_id),
                 "search_query": query,
                 "candidates": candidates,
                 "events": events,
@@ -479,14 +500,26 @@ def render_comic_ebook_studio(api_key):
                     "no credentials", "sign in", "login", "not created",
                 )):
                     st.error(
-                        "The website blocked creation because sign-in is required. "
-                        "No PDF or cover was created. A completed TinyFish browser run "
-                        "does not mean the e-book task succeeded."
+                        "The website requires sign-in. This run did not create a PDF or cover."
                     )
+                    if not record.get("profile_id_used"):
+                        st.warning(
+                            "Sign in once through a TinyFish Browser Context Profile, save "
+                            "that profile, then rerun this project with its Profile ID in "
+                            "Advanced options. This allows TinyFish to reuse your authorized "
+                            "login session without putting your password in this app."
+                        )
+                    else:
+                        st.warning(
+                            "A saved login profile was supplied, but the website still "
+                            "requested authentication. The session may have expired or may "
+                            "need additional verification. Refresh the profile through "
+                            "TinyFish's profile setup flow and retry."
+                        )
                     st.caption(
-                        "Use a website where the required creation and PDF export are "
-                        "available in the agent's browser session, or provide an authorized "
-                        "website/account workflow. Do not share passwords in this app."
+                        "The STREAMING_URL is a live browser preview; it is not guaranteed "
+                        "to be an interactive window where you can type your password. "
+                        "Never paste passwords or one-time codes into the task prompt."
                     )
                 else:
                     st.info(
