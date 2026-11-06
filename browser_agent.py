@@ -1,4 +1,4 @@
-"""Optional Browser Use agent powered by Groq."""
+"""Browser Use agent powered by the native Browser Use Groq integration."""
 import asyncio
 import os
 import subprocess
@@ -7,7 +7,8 @@ from pathlib import Path
 
 import streamlit as st
 
-GROQ_MODEL = "openai/gpt-oss-20b"
+# This model is listed in Browser Use's current Groq integration guidance.
+GROQ_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
 MAX_TASK_LENGTH = 3000
 
 
@@ -26,6 +27,9 @@ def ensure_chromium():
 
 
 async def run_browser_task(task, api_key, max_steps):
+    # Use Browser Use's own ChatGroq class. Do not use langchain_groq.ChatGroq:
+    # Browser Use may send structured/multimodal message content that the
+    # LangChain Groq wrapper/API path can reject with HTTP 400.
     from browser_use import Agent, Browser, ChatGroq
 
     os.environ["GROQ_API_KEY"] = api_key
@@ -58,7 +62,7 @@ async def run_browser_task(task, api_key, max_steps):
 def render_browser_use_agent():
     st.divider()
     st.header("Open-source Browser Agent (Browser Use + Groq)")
-    st.caption("An optional browser automation route, separate from TinyFish.")
+    st.caption("Browser Use's native Groq integration. No TinyFish API is required.")
     try:
         groq_key = st.secrets.get("GROQ_API_KEY", "").strip()
     except Exception:
