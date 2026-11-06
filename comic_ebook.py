@@ -2,6 +2,7 @@
 
 import json
 import re
+import time
 
 import requests
 import streamlit as st
@@ -48,20 +49,48 @@ def _discover_comic_sites(api_key, topic):
         "online comic book creator illustrated storybook maker "
         "AI comic generator export or download PDF"
     )
-    response = requests.get(
-        SEARCH_URL,
-        headers={"X-API-Key": api_key, "Accept": "application/json"},
-        params={"query": query},
-        timeout=40,
-    )
+    response = None
+    retryable_statuses = {429, 500, 502, 503, 504}
+    last_error = None
+
+    # Search can temporarily return SERVICE_BUSY (HTTP 503). Retry a few times
+    # before failing so a short provider outage does not immediately stop the workflow.
+    for attempt in range(4):
+        try:
+            response = requests.get(
+                SEARCH_URL,
+                headers={"X-API-Key": api_key, "Accept": "application/json"},
+                params={"query": query},
+                timeout=40,
+            )
+            if response.status_code not in retryable_statuses:
+                break
+            last_error = (
+                f"TinyFish Search returned HTTP {response.status_code}: "
+                f"{response.text[:1000]}"
+            )
+        except requests.exceptions.RequestException as exc:
+            last_error = f"TinyFish Search network error: {exc}"
+            if attempt == 3:
+                raise RuntimeError(last_error) from exc
+
+        if attempt < 3:
+            time.sleep(2 ** attempt)
+
+    if response is None:
+        raise RuntimeError(last_error or "TinyFish Search could not be reached.")
     if response.status_code >= 400:
         raise RuntimeError(
-            f"TinyFish Search returned HTTP {response.status_code}: {response.text[:1000]}"
+            (last_error or
+             f"TinyFish Search returned HTTP {response.status_code}: {response.text[:1000]}")
+            + " You can retry later or enter a website manually under Advanced option."
         )
     try:
         payload = response.json()
     except ValueError as exc:
         raise RuntimeError("TinyFish Search returned an invalid response.") from exc
+    finally:
+        response.close()
 
     candidates = _extract_urls(payload)
     if not candidates:
