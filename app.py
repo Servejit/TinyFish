@@ -274,17 +274,21 @@ task = st.text_area(
     ),
 )
 
+# Keep the browser profile field visible so users can use saved Gmail sessions without opening Advanced options.
+st.markdown("#### 🔐 Saved browser login (optional)")
+profile_id = st.text_input(
+    "TinyFish Browser Context Profile ID",
+    placeholder="prof_... (your saved Gmail sign-in profile)",
+    help="Sign in to Gmail inside a TinyFish Browser Context Profile setup session, save that profile, then paste its ID here. Never enter your Gmail password or OTP here.",
+    key="visible_tinyfish_profile_id",
+).strip()
+st.caption("Use this for Gmail and other sites that require sign-in. Leave blank for normal public-website tasks.")
+
 with st.expander("Advanced options (optional)"):
     website_override = st.text_input(
         "Use a specific website instead (leave blank for automatic discovery)",
         placeholder="https://example.com",
     )
-    profile_id = st.text_input(
-        "TinyFish Browser Context Profile ID (optional)",
-        placeholder="prof_... (saved Gmail sign-in profile)",
-        help="For Gmail, sign in inside a TinyFish Browser Context Profile setup session, save it, then enter that profile ID here. Never enter your Gmail password or OTP in this app.",
-    ).strip()
-    st.caption("A saved profile is applied to the browser run using use_profile=true. The profile must already contain a valid Gmail login session.")
 
 run_clicked = st.button("✨ Plan and run task", type="primary", use_container_width=True)
 
