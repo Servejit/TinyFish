@@ -68,6 +68,10 @@ with st.sidebar:
 from stock_strategy import render_stock_strategy_builder
 render_stock_strategy_builder(api_key)
 
+# Dedicated reusable comic e-book creator; existing stock and general agent tools remain intact.
+from comic_ebook import render_comic_ebook_studio
+render_comic_ebook_studio(api_key)
+
 def valid_http_url(value):
     try:
         parsed = urlparse(value.strip())
