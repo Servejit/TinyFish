@@ -198,7 +198,7 @@ def parse_event(line):
     except json.JSONDecodeError:
         return {"type": "MESSAGE", "message": raw}
 
-def run_agent(api_key, url, goal, progress_area):
+def run_agent(api_key, url, goal, progress_area, profile_id=None):
     headers = {
         "X-API-Key": api_key,
         "Content-Type": "application/json",
@@ -207,7 +207,11 @@ def run_agent(api_key, url, goal, progress_area):
     response = requests.post(
         AGENT_URL,
         headers=headers,
-        json={"url": url, "goal": goal},
+        json={
+            "url": url,
+            "goal": goal,
+            **({"use_profile": True, "profile_id": profile_id} if profile_id else {}),
+        },
         stream=True,
         timeout=TIMEOUT,
     )
@@ -275,7 +279,12 @@ with st.expander("Advanced options (optional)"):
         "Use a specific website instead (leave blank for automatic discovery)",
         placeholder="https://example.com",
     )
-    st.caption("Only enter a website if you want to override automatic discovery.")
+    profile_id = st.text_input(
+        "TinyFish Browser Context Profile ID (optional)",
+        placeholder="prof_... (saved Gmail sign-in profile)",
+        help="For Gmail, sign in inside a TinyFish Browser Context Profile setup session, save it, then enter that profile ID here. Never enter your Gmail password or OTP in this app.",
+    ).strip()
+    st.caption("A saved profile is applied to the browser run using use_profile=true. The profile must already contain a valid Gmail login session.")
 
 run_clicked = st.button("✨ Plan and run task", type="primary", use_container_width=True)
 
@@ -309,7 +318,8 @@ if run_clicked:
                 progress = st.empty()
                 st.write("Starting TinyFish browser automation…")
                 events, final_event, preview_url = run_agent(
-                    api_key.strip(), selected_url, goal, progress
+                    api_key.strip(), selected_url, goal, progress,
+                    profile_id=profile_id or None,
                 )
                 final_type = str((final_event or {}).get("type", "")).upper()
                 final_status = str((final_event or {}).get("status", "")).upper()
@@ -330,6 +340,7 @@ if run_clicked:
             record = {
                 "task": task.strip(),
                 "website": selected_url,
+                "profile_id_used": bool(profile_id),
                 "search_query": search_query,
                 "candidates": candidates,
                 "started_at": started_at,
