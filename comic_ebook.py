@@ -404,12 +404,24 @@ def render_comic_ebook_studio(api_key):
                     if result is None:
                         result = final_event
 
+                # A COMPLETE event only means the browser run ended. The agent's
+                # own report may still say the requested task failed or was blocked.
+                result_text = json.dumps(result, ensure_ascii=False).lower()
+                blocked_terms = (
+                    "blocked by authentication", "authentication requirement",
+                    "unable to generate", "not created", "task status: failed",
+                    "no content was created", "could not create",
+                )
+                task_blocked = any(term in result_text for term in blocked_terms)
                 completed = (
                     final_type == "COMPLETE"
                     and final_status in ("COMPLETED", "SUCCESS", "SUCCEEDED")
+                    and not task_blocked
                 )
                 if completed:
                     status.update(label="TinyFish run finished — verify the PDF below", state="complete", expanded=False)
+                elif task_blocked:
+                    status.update(label="Agent run ended, but the e-book task was blocked or failed", state="error", expanded=True)
                 elif final_event:
                     status.update(label=f"TinyFish run ended: {final_status or final_type}", state="error", expanded=True)
                 else:
@@ -461,10 +473,27 @@ def render_comic_ebook_studio(api_key):
                 for label, url in output_links:
                     st.markdown(f"- [{label}]({url})")
             else:
-                st.info(
-                    "No verified PDF or cover download URL was found in the returned result. "
-                    "Open the browser session or inspect the event log to see what the website produced."
-                )
+                result_text = json.dumps(result, ensure_ascii=False).lower()
+                if any(term in result_text for term in (
+                    "blocked by authentication", "authentication requirement",
+                    "no credentials", "sign in", "login", "not created",
+                )):
+                    st.error(
+                        "The website blocked creation because sign-in is required. "
+                        "No PDF or cover was created. A completed TinyFish browser run "
+                        "does not mean the e-book task succeeded."
+                    )
+                    st.caption(
+                        "Use a website where the required creation and PDF export are "
+                        "available in the agent's browser session, or provide an authorized "
+                        "website/account workflow. Do not share passwords in this app."
+                    )
+                else:
+                    st.info(
+                        "No verified PDF or cover download URL was found in the returned result. "
+                        "Inspect the browser session and event log to determine whether the "
+                        "website created the files or stopped before export."
+                    )
 
         if record.get("search_query"):
             with st.expander("Websites considered"):
